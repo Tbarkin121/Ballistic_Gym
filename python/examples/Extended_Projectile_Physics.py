@@ -1,26 +1,12 @@
 """
-Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
-
-NVIDIA CORPORATION and its licensors retain all intellectual property
-and proprietary rights in and to this software, related documentation
-and any modifications thereto. Any use, reproduction, disclosure or
-distribution of this software and related documentation without an express
-license agreement from NVIDIA CORPORATION is strictly prohibited.
-
-
-DOF control methods example
----------------------------
-An example that demonstrates various DOF control methods:
-- Load cartpole asset from an urdf
-- Get/set DOF properties
-- Set DOF position and velocity targets
-- Get DOF positions
-- Apply DOF efforts
+Spawning a projectile with state control
+Using a combination of my walkbot code and issacgym projectile.py example to get started
 """
 
 import math
 from isaacgym import gymutil, gymtorch, gymapi
 import time
+import numpy as np
 
 # initialize gym
 gym = gymapi.acquire_gym()
@@ -46,13 +32,12 @@ if args.use_gpu_pipeline:
     print("WARNING: Forcing CPU pipeline.")
 
 sim_params.up_axis = gymapi.UP_AXIS_Z
-sim_params.gravity = gymapi.Vec3(0.0, 0.0, 0.0)
+sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
 sim = gym.create_sim(args.compute_device_id, args.graphics_device_id, args.physics_engine, sim_params)
 
 if sim is None:
     print("*** Failed to create sim")
     quit()
-
 
 
 # add ground plane
@@ -62,7 +47,7 @@ plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
 gym.add_ground(sim, plane_params)
 
 # set up the env grid
-num_envs = 4
+num_envs = 1
 spacing = 1.5
 env_lower = gymapi.Vec3(-spacing, 0.0, -spacing)
 env_upper = gymapi.Vec3(spacing, 0.0, spacing)
@@ -78,6 +63,7 @@ asset_options.fix_base_link = False
 asset_options.angular_damping = 0.0
 asset_options.max_angular_velocity = 10000
 asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
+asset_options.disable_gravity = True
 print("Loading asset '%s' from '%s'" % (asset_file, asset_root))
 cubebot_asset = gym.load_asset(sim, asset_root, asset_file, asset_options)
 
@@ -91,6 +77,28 @@ initial_pose.r = gymapi.Quat(0, 0.0, 0.0, 1.0)
 # Pole held at a 45 degree angle using position target mode.
 env0 = gym.create_env(sim, env_lower, env_upper, 2)
 cubebot0 = gym.create_actor(env0, cubebot_asset, initial_pose, 'CubeBot', 0, 0)
+num_projectiles = 10
+proj_asset_options = gymapi.AssetOptions()
+proj_asset_options.density = 10.
+proj_asset = gym.create_box(sim, 0.05, 0.05, 0.05, proj_asset_options)
+projectiles = []
+for n in range(num_projectiles):
+    pose = gymapi.Transform()
+    pose.p = gymapi.Vec3(n * 0.5, 1.0, 50)
+    pose.r = gymapi.Quat(0, 0, 0, 1)
+
+    # create actors which will collide with actors in any environment
+    ahandle = gym.create_actor(env0, proj_asset, pose, "projectile" + str(n), -1, 0)
+
+    # set each projectile to a different, random color
+    c = 0.5 + 0.5 * np.random.random(3)
+    gym.set_rigid_body_color(env0, ahandle, 0, gymapi.MESH_VISUAL_AND_COLLISION, gymapi.Vec3(c[0], c[1], c[2]))
+
+    projectiles.append(ahandle)
+# save initial state for reset
+initial_state = np.copy(gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL))
+proj_index = 0
+
 # Configure DOF properties
 props = gym.get_actor_dof_properties(env0, cubebot0)
 props["driveMode"][:] = gymapi.DOF_MODE_POS
@@ -108,6 +116,9 @@ dof_keys = list(dof_dict.keys())
 actor_root_state = gym.acquire_actor_root_state_tensor(sim)
 root_states = gymtorch.wrap_tensor(actor_root_state)
 
+num_actors = gym.get_actor_count(env0)
+walkbot_state = root_states.view(num_envs, num_actors, 13)[0,0,:]
+
 # targets = torch.tensor([1000, 0, 0, 0, 0, 0])
 # gym.set_dof_velocity_target_tensor(env0, gymtorch.unwrap_tensor(targets))
 
@@ -115,6 +126,12 @@ root_states = gymtorch.wrap_tensor(actor_root_state)
 viewer = gym.create_viewer(sim, gymapi.CameraProperties())
 if viewer is None:
     raise ValueError('*** Failed to create viewer')
+
+# subscribe to input events. This allows input to be used to interact
+# with the simulation
+gym.subscribe_viewer_keyboard_event(viewer, gymapi.KEY_SPACE, "space_shoot")
+gym.subscribe_viewer_keyboard_event(viewer, gymapi.KEY_R, "reset")
+
 
 # Look at the first env
 cam_pos = gymapi.Vec3(2, 1, 1)
@@ -130,12 +147,39 @@ max_loops = 50
 
 while not gym.query_viewer_has_closed(viewer):
     gym.refresh_actor_root_state_tensor(sim)
-    print(root_states)
+    print(walkbot_state)
 
     # step the physics
     gym.simulate(sim)
     gym.fetch_results(sim, True)
 
+    for evt in gym.query_viewer_action_events(viewer):
+        if (evt.action == "space_shoot") and evt.value > 0:
+            bot_pose = gymapi.Transform()
+            bot_pose.p.x = walkbot_state[0]
+            bot_pose.p.y = walkbot_state[1]
+            bot_pose.p.z = walkbot_state[2]
+            bot_pose.r.x = walkbot_state[3]
+            bot_pose.r.y = walkbot_state[4]
+            bot_pose.r.z = walkbot_state[5]
+            bot_pose.r.w = walkbot_state[6]
+            
+            proj_dir = bot_pose.r.rotate(gymapi.Vec3(0,0,1))
+            spawn = bot_pose.p
+            speed = 5
+            vel = proj_dir * speed
+
+            angvel = 1.57 - 3.14 * np.random.random(3)
+
+            proj_handle = projectiles[proj_index]
+            state = gym.get_actor_rigid_body_states(env0, proj_handle, gymapi.STATE_NONE)
+            state['pose']['p'].fill((spawn.x, spawn.y, spawn.z))
+            state['pose']['r'].fill((0, 0, 0, 1))
+            state['vel']['linear'].fill((vel.x, vel.y, vel.z))
+            state['vel']['angular'].fill((angvel[0], angvel[1], angvel[2]))
+            gym.set_actor_rigid_body_states(env0, proj_handle, state, gymapi.STATE_ALL)
+
+            proj_index = (proj_index + 1) % len(projectiles)
     # update the viewer
     gym.step_graphics(sim)
     gym.draw_viewer(viewer, sim, True)
