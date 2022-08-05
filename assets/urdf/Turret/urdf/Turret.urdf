@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="Turret">
+  <link
+    name="base">
+    <inertial>
+      <origin
+        xyz="0 0.005 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.0196349540849362" />
+      <inertia
+        ixx="3.23158619314575E-06"
+        ixy="-4.74299031266813E-39"
+        ixz="0"
+        iyy="6.13592315154257E-06"
+        iyz="1.21887028383951E-38"
+        izz="3.23158619314575E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/base.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/base.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="head">
+    <inertial>
+      <origin
+        xyz="1.56125112837913E-17 0.0307309903151901 -0.00562014722037463"
+        rpy="0 0 0" />
+      <mass
+        value="0.423684878840857" />
+      <inertia
+        ixx="0.000400381296860664"
+        ixy="-4.68192748819734E-20"
+        ixz="3.67266287017081E-20"
+        iyy="0.000673682621258193"
+        iyz="4.14608921495357E-05"
+        izz="0.00045787110991625" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/head.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/head.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="yaw"
+    type="revolute">
+    <origin
+      xyz="0 0.01 0"
+      rpy="0 0 0" />
+    <parent
+      link="base" />
+    <child
+      link="head" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.1415"
+      upper="3.1415"
+      effort="1"
+      velocity="1" />
+  </joint>
+  <link
+    name="barrel">
+    <inertial>
+      <origin
+        xyz="-3.12250225675825E-17 0 0.024248561432183"
+        rpy="0 0 0" />
+      <mass
+        value="0.0134260331675742" />
+      <inertia
+        ixx="1.67387334730734E-05"
+        ixy="-1.21716375765917E-22"
+        ixz="1.72263883210385E-20"
+        iyy="1.67387334730734E-05"
+        iyz="9.63442059864229E-23"
+        izz="6.22126025294151E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/barrel.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://Turret/meshes/barrel.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="pitch"
+    type="revolute">
+    <origin
+      xyz="0 0.042984 0.0033423"
+      rpy="0 0 0" />
+    <parent
+      link="head" />
+    <child
+      link="barrel" />
+    <axis
+      xyz="-1 0 0" />
+    <limit
+      lower="0"
+      upper="1.5708"
+      effort="1"
+      velocity="1" />
+  </joint>
+</robot>

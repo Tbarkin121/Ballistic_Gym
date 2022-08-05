@@ -10,7 +10,7 @@
     name="spawn_model"
     pkg="gazebo_ros"
     type="spawn_model"
-    args="-file $(find WalkBot)/urdf/WalkBot.urdf -urdf -model WalkBot"
+    args="-file $(find Turret)/urdf/Turret.urdf -urdf -model Turret"
     output="screen" />
   <node
     name="fake_joint_calibration"
